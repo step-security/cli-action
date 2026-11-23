@@ -1,7 +1,7 @@
 import { defineConfig } from "oxfmt";
 
 export default defineConfig({
-  ignorePatterns: ["bin/**"],
+  ignorePatterns: ["dist/**"],
   jsdoc: true,
   objectWrap: "collapse",
   printWidth: 130,
