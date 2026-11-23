@@ -1,5 +1,8 @@
-import { execSync } from "child_process";
+import { execSync, execFileSync } from "child_process";
+import crypto from "crypto";
 import fs from "fs";
+import os from "os";
+import path from "path";
 import * as core from "@actions/core";
 import * as io from "@actions/io";
 import * as tc from "@actions/tool-cache";
@@ -60,11 +63,13 @@ async function run() {
     case "win32": {
       const url = "https://cli.doppler.com/download?os=windows&arch=amd64&format=zip";
       await installZip(binDir, url);
+      await verifyBinary(binDir);
       break;
     }
     case "linux":
     case "darwin": {
       await executeInstallSh(binDir);
+      await verifyBinary(binDir);
       break;
     }
     default: {
@@ -73,11 +78,11 @@ async function run() {
   }
 }
 
-async function installZip(path: string, url: string) {
-  await io.mkdirP(path);
+async function installZip(dir: string, url: string) {
+  await io.mkdirP(dir);
   const downloadPath = await tc.downloadTool(url);
-  await tc.extractZip(downloadPath, path);
-  core.addPath(path);
+  await tc.extractZip(downloadPath, dir);
+  core.addPath(dir);
 }
 
 async function executeInstallSh(installPath: string) {
@@ -93,4 +98,54 @@ async function executeInstallSh(installPath: string) {
 
   // add binary to PATH
   core.addPath(installPath);
+}
+
+class ChecksumMismatchError extends Error {}
+
+function sha256(file: string) {
+  return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+
+// Cross-checks the installed binary against the checksums published on the DopplerHQ/cli GitHub release.
+// Only a checksum mismatch fails the action; any other problem is logged and the install proceeds.
+async function verifyBinary(installPath: string) {
+  try {
+    const isWindows = process.platform === "win32";
+    const binaryName = isWindows ? "doppler.exe" : "doppler";
+    const installedBinary = path.join(installPath, binaryName);
+
+    const versionOutput = execFileSync(installedBinary, ["--version"], { encoding: "utf8", timeout: 10000 });
+    const version = versionOutput.match(/\d+\.\d+\.\d+/)?.[0];
+    if (!version) throw new Error(`could not determine version from '${versionOutput.trim()}'`);
+
+    const arch = isWindows ? "amd64" : ({ x64: "amd64", arm64: "arm64" } as Record<string, string>)[process.arch];
+    if (!arch) throw new Error(`unsupported architecture '${process.arch}'`);
+    const platform = isWindows ? "windows" : process.platform === "darwin" ? "macOS" : "linux";
+    const archiveName = `doppler_${version}_${platform}_${arch}.${isWindows ? "zip" : "tar.gz"}`;
+    const releaseUrl = `https://github.com/DopplerHQ/cli/releases/download/${version}`;
+
+    const checksumsPath = await tc.downloadTool(`${releaseUrl}/checksums.txt`);
+    const expected = fs
+      .readFileSync(checksumsPath, "utf8")
+      .split("\n")
+      .map((line) => line.trim().split(/\s+/))
+      .find(([, name]) => name === archiveName)?.[0];
+    if (!expected) throw new Error(`no checksum listed for ${archiveName}`);
+
+    const archivePath = await tc.downloadTool(`${releaseUrl}/${archiveName}`);
+    const actual = sha256(archivePath);
+    if (actual !== expected) {
+      throw new ChecksumMismatchError(`checksum mismatch for ${archiveName}: expected ${expected}, got ${actual}`);
+    }
+
+    const extractDir = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "doppler-verify-"));
+    await (isWindows ? tc.extractZip(archivePath, extractDir) : tc.extractTar(archivePath, extractDir));
+    if (sha256(path.join(extractDir, binaryName)) !== sha256(installedBinary)) {
+      throw new ChecksumMismatchError(`installed ${binaryName} does not match the binary in the official ${archiveName}`);
+    }
+    core.info(`Verified doppler ${version} against the DopplerHQ/cli release checksums`);
+  } catch (error) {
+    if (error instanceof ChecksumMismatchError) throw error;
+    core.warning(`Skipping binary checksum verification: ${error instanceof Error ? error.message : error}`);
+  }
 }

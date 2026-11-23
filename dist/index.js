@@ -1,14 +1,14 @@
 import { createRequire } from "node:module";
 import * as child from "child_process";
-import { execSync } from "child_process";
+import { execFileSync, execSync } from "child_process";
+import * as crypto$2 from "crypto";
+import crypto from "crypto";
 import * as fs$2 from "fs";
 import fs, { constants, promises } from "fs";
 import * as os$1 from "os";
 import os, { EOL } from "os";
-import * as crypto$2 from "crypto";
-import crypto from "crypto";
-import * as path$1 from "path";
-import { resolve } from "path";
+import * as path$2 from "path";
+import path, { resolve } from "path";
 import * as http$3 from "http";
 import http from "http";
 import * as https$3 from "https";
@@ -16873,7 +16873,7 @@ function tryGetExecutablePath(filePath, extensions) {
 		}
 		if (stats && stats.isFile()) {
 			if (IS_WINDOWS$2) {
-				const upperExt = path$1.extname(filePath).toUpperCase();
+				const upperExt = path$2.extname(filePath).toUpperCase();
 				if (extensions.some((validExt) => validExt.toUpperCase() === upperExt)) return filePath;
 			} else if (isUnixExecutable(stats)) return filePath;
 		}
@@ -16889,10 +16889,10 @@ function tryGetExecutablePath(filePath, extensions) {
 			if (stats && stats.isFile()) {
 				if (IS_WINDOWS$2) {
 					try {
-						const directory = path$1.dirname(filePath);
-						const upperName = path$1.basename(filePath).toUpperCase();
+						const directory = path$2.dirname(filePath);
+						const upperName = path$2.basename(filePath).toUpperCase();
 						for (const actualName of yield readdir(directory)) if (upperName === actualName.toUpperCase()) {
-							filePath = path$1.join(directory, actualName);
+							filePath = path$2.join(directory, actualName);
 							break;
 						}
 					} catch (err) {
@@ -17014,21 +17014,21 @@ function findInPath(tool) {
 		if (!tool) throw new Error("parameter 'tool' is required");
 		const extensions = [];
 		if (IS_WINDOWS$2 && process.env["PATHEXT"]) {
-			for (const extension of process.env["PATHEXT"].split(path$1.delimiter)) if (extension) extensions.push(extension);
+			for (const extension of process.env["PATHEXT"].split(path$2.delimiter)) if (extension) extensions.push(extension);
 		}
 		if (isRooted(tool)) {
 			const filePath = yield tryGetExecutablePath(tool, extensions);
 			if (filePath) return [filePath];
 			return [];
 		}
-		if (tool.includes(path$1.sep)) return [];
+		if (tool.includes(path$2.sep)) return [];
 		const directories = [];
 		if (process.env.PATH) {
-			for (const p of process.env.PATH.split(path$1.delimiter)) if (p) directories.push(p);
+			for (const p of process.env.PATH.split(path$2.delimiter)) if (p) directories.push(p);
 		}
 		const matches = [];
 		for (const directory of directories) {
-			const filePath = yield tryGetExecutablePath(path$1.join(directory, tool), extensions);
+			const filePath = yield tryGetExecutablePath(path$2.join(directory, tool), extensions);
 			if (filePath) matches.push(filePath);
 		}
 		return matches;
@@ -17236,7 +17236,7 @@ var ToolRunner = class extends events.EventEmitter {
 	*/
 	exec() {
 		return __awaiter$6(this, void 0, void 0, function* () {
-			if (!isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS$1 && this.toolPath.includes("\\"))) this.toolPath = path$1.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
+			if (!isRooted(this.toolPath) && (this.toolPath.includes("/") || IS_WINDOWS$1 && this.toolPath.includes("\\"))) this.toolPath = path$2.resolve(process.cwd(), this.options.cwd || process.cwd(), this.toolPath);
 			this.toolPath = yield which(this.toolPath, true);
 			return new Promise((resolve, reject) => __awaiter$6(this, void 0, void 0, function* () {
 				this._debug(`exec tool: ${this.toolPath}`);
@@ -17463,7 +17463,7 @@ var ExitCode;
 function addPath(inputPath) {
 	if (process.env["GITHUB_PATH"] || "") issueFileCommand("PATH", inputPath);
 	else issueCommand("add-path", {}, inputPath);
-	process.env["PATH"] = `${inputPath}${path$1.delimiter}${process.env["PATH"]}`;
+	process.env["PATH"] = `${inputPath}${path$2.delimiter}${process.env["PATH"]}`;
 }
 /**
 * Sets the action status to failed.
@@ -17494,6 +17494,14 @@ function debug(message) {
 */
 function error(message, properties = {}) {
 	issueCommand("error", toCommandProperties(properties), message instanceof Error ? message.toString() : message);
+}
+/**
+* Adds a warning issue
+* @param message warning issue message. Errors will be converted to string via toString()
+* @param properties optional properties to add to the annotation.
+*/
+function warning(message, properties = {}) {
+	issueCommand("warning", toCommandProperties(properties), message instanceof Error ? message.toString() : message);
 }
 /**
 * Writes info to log with console.log.
@@ -19015,8 +19023,8 @@ const userAgent = "actions/tool-cache";
 */
 function downloadTool(url, dest, auth, headers) {
 	return __awaiter(this, void 0, void 0, function* () {
-		dest = dest || path$1.join(_getTempDirectory(), crypto$2.randomUUID());
-		yield mkdirP(path$1.dirname(dest));
+		dest = dest || path$2.join(_getTempDirectory(), crypto$2.randomUUID());
+		yield mkdirP(path$2.dirname(dest));
 		debug(`Downloading ${url}`);
 		debug(`Destination ${dest}`);
 		return yield new RetryHelper(3, _getGlobal("TEST_DOWNLOAD_TOOL_RETRY_MIN_SECONDS", 10), _getGlobal("TEST_DOWNLOAD_TOOL_RETRY_MAX_SECONDS", 20)).execute(() => __awaiter(this, void 0, void 0, function* () {
@@ -19062,6 +19070,50 @@ function downloadToolAttempt(url, dest, auth, headers) {
 				}
 			}
 		}
+	});
+}
+/**
+* Extract a compressed tar archive
+*
+* @param file     path to the tar
+* @param dest     destination directory. Optional.
+* @param flags    flags for the tar command to use for extraction. Defaults to 'xz' (extracting gzipped tars). Optional.
+* @returns        path to the destination directory
+*/
+function extractTar(file_1, dest_1) {
+	return __awaiter(this, arguments, void 0, function* (file, dest, flags = "xz") {
+		if (!file) throw new Error("parameter 'file' is required");
+		dest = yield _createExtractFolder(dest);
+		debug("Checking tar --version");
+		let versionOutput = "";
+		yield exec("tar --version", [], {
+			ignoreReturnCode: true,
+			silent: true,
+			listeners: {
+				stdout: (data) => versionOutput += data.toString(),
+				stderr: (data) => versionOutput += data.toString()
+			}
+		});
+		debug(versionOutput.trim());
+		const isGnuTar = versionOutput.toUpperCase().includes("GNU TAR");
+		let args;
+		if (flags instanceof Array) args = flags;
+		else args = [flags];
+		if (isDebug() && !flags.includes("v")) args.push("-v");
+		let destArg = dest;
+		let fileArg = file;
+		if (IS_WINDOWS && isGnuTar) {
+			args.push("--force-local");
+			destArg = dest.replace(/\\/g, "/");
+			fileArg = file.replace(/\\/g, "/");
+		}
+		if (isGnuTar) {
+			args.push("--warning=no-unknown-keyword");
+			args.push("--overwrite");
+		}
+		args.push("-C", destArg, "-f", fileArg);
+		yield exec(`tar`, args);
+		return dest;
 	});
 }
 /**
@@ -19135,7 +19187,7 @@ function extractZipNix(file, dest) {
 }
 function _createExtractFolder(dest) {
 	return __awaiter(this, void 0, void 0, function* () {
-		if (!dest) dest = path$1.join(_getTempDirectory(), crypto$2.randomUUID());
+		if (!dest) dest = path$2.join(_getTempDirectory(), crypto$2.randomUUID());
 		yield mkdirP(dest);
 		return dest;
 	});
@@ -28952,7 +29004,7 @@ var require_populate = /* @__PURE__ */ __commonJSMin(((exports, module) => {
 var FormData_default = (/* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin(((exports, module) => {
 	var CombinedStream = require_combined_stream();
 	var util$2 = __require("util");
-	var path = __require("path");
+	var path$1 = __require("path");
 	var http$2 = __require("http");
 	var https$2 = __require("https");
 	var parseUrl$1 = __require("url").parse;
@@ -29061,9 +29113,9 @@ var FormData_default = (/* @__PURE__ */ __toESM((/* @__PURE__ */ __commonJSMin((
 	};
 	FormData.prototype._getContentDisposition = function(value, options) {
 		var filename;
-		if (typeof options.filepath === "string") filename = path.normalize(options.filepath).replace(/\\/g, "/");
-		else if (options.filename || value && (value.name || value.path)) filename = path.basename(options.filename || value && (value.name || value.path));
-		else if (value && value.readable && hasOwn(value, "httpVersion")) filename = path.basename(value.client._httpMessage.path || "");
+		if (typeof options.filepath === "string") filename = path$1.normalize(options.filepath).replace(/\\/g, "/");
+		else if (options.filename || value && (value.name || value.path)) filename = path$1.basename(options.filename || value && (value.name || value.path));
+		else if (value && value.readable && hasOwn(value, "httpVersion")) filename = path$1.basename(value.client._httpMessage.path || "");
 		if (filename) return "filename=\"" + escapeHeaderParam(filename) + "\"";
 	};
 	FormData.prototype._getContentType = function(value, options) {
@@ -35095,18 +35147,20 @@ async function run() {
 	switch (process.platform) {
 		case "win32":
 			await installZip(binDir, "https://cli.doppler.com/download?os=windows&arch=amd64&format=zip");
+			await verifyBinary(binDir);
 			break;
 		case "linux":
 		case "darwin":
 			await executeInstallSh(binDir);
+			await verifyBinary(binDir);
 			break;
 		default: throw new Error(`Unsupported platform '${process.platform}'`);
 	}
 }
-async function installZip(path, url) {
-	await mkdirP(path);
-	await extractZip(await downloadTool(url), path);
-	addPath(path);
+async function installZip(dir, url) {
+	await mkdirP(dir);
+	await extractZip(await downloadTool(url), dir);
+	addPath(dir);
 }
 async function executeInstallSh(installPath) {
 	const downloadPath = await downloadTool("https://cli.doppler.com/install.sh");
@@ -35118,6 +35172,43 @@ async function executeInstallSh(installPath) {
 		stdio: "inherit"
 	});
 	addPath(installPath);
+}
+var ChecksumMismatchError = class extends Error {};
+function sha256(file) {
+	return crypto.createHash("sha256").update(fs.readFileSync(file)).digest("hex");
+}
+async function verifyBinary(installPath) {
+	try {
+		const isWindows = process.platform === "win32";
+		const binaryName = isWindows ? "doppler.exe" : "doppler";
+		const installedBinary = path.join(installPath, binaryName);
+		const versionOutput = execFileSync(installedBinary, ["--version"], {
+			encoding: "utf8",
+			timeout: 1e4
+		});
+		const version = versionOutput.match(/\d+\.\d+\.\d+/)?.[0];
+		if (!version) throw new Error(`could not determine version from '${versionOutput.trim()}'`);
+		const arch = isWindows ? "amd64" : {
+			x64: "amd64",
+			arm64: "arm64"
+		}[process.arch];
+		if (!arch) throw new Error(`unsupported architecture '${process.arch}'`);
+		const archiveName = `doppler_${version}_${isWindows ? "windows" : process.platform === "darwin" ? "macOS" : "linux"}_${arch}.${isWindows ? "zip" : "tar.gz"}`;
+		const releaseUrl = `https://github.com/DopplerHQ/cli/releases/download/${version}`;
+		const checksumsPath = await downloadTool(`${releaseUrl}/checksums.txt`);
+		const expected = fs.readFileSync(checksumsPath, "utf8").split("\n").map((line) => line.trim().split(/\s+/)).find(([, name]) => name === archiveName)?.[0];
+		if (!expected) throw new Error(`no checksum listed for ${archiveName}`);
+		const archivePath = await downloadTool(`${releaseUrl}/${archiveName}`);
+		const actual = sha256(archivePath);
+		if (actual !== expected) throw new ChecksumMismatchError(`checksum mismatch for ${archiveName}: expected ${expected}, got ${actual}`);
+		const extractDir = fs.mkdtempSync(path.join(process.env.RUNNER_TEMP || os.tmpdir(), "doppler-verify-"));
+		await (isWindows ? extractZip(archivePath, extractDir) : extractTar(archivePath, extractDir));
+		if (sha256(path.join(extractDir, binaryName)) !== sha256(installedBinary)) throw new ChecksumMismatchError(`installed ${binaryName} does not match the binary in the official ${archiveName}`);
+		info(`Verified doppler ${version} against the DopplerHQ/cli release checksums`);
+	} catch (error) {
+		if (error instanceof ChecksumMismatchError) throw error;
+		warning(`Skipping binary checksum verification: ${error instanceof Error ? error.message : error}`);
+	}
 }
 //#endregion
 export {};
