@@ -12,8 +12,6 @@ Include this Action as a step in your workflow:
 uses: step-security/cli-action@v4
 ```
 
-You can see a live example of this Action [here](https://github.com/DopplerHQ/cli/blob/master/.github/workflows/cli-action.yml).
-
 ## Configuration
 
 In most cases, you'll need to provide the CLI with an auth token. You can do so via the `DOPPLER_TOKEN` environment variable. In the below example, the token is retrieved from [GitHub secrets](https://docs.github.com/en/actions/security-guides/encrypted-secrets).
