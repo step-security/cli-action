@@ -9,7 +9,7 @@ The [Doppler CLI](https://github.com/DopplerHQ/cli) is the official tool for int
 Include this Action as a step in your workflow:
 
 ```
-uses: step-security/cli-action@v4
+uses: step-security/dopplerhq-cli-action@v4
 ```
 
 ## Configuration
@@ -26,7 +26,7 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - name: Install CLI
-        uses: step-security/cli-action@v4
+        uses: step-security/dopplerhq-cli-action@v4
       - name: Do something with the CLI
         run: doppler secrets --only-names
         env:

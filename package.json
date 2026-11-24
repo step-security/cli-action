@@ -1,18 +1,18 @@
 {
-  "name": "cli-action",
+  "name": "dopplerhq-cli-action",
   "version": "4.0.1",
   "private": true,
   "description": "GitHub Action to install the Doppler CLI",
   "keywords": [],
-  "homepage": "https://github.com/step-security/cli-action#readme",
+  "homepage": "https://github.com/step-security/dopplerhq-cli-action#readme",
   "bugs": {
-    "url": "https://github.com/step-security/cli-action/issues"
+    "url": "https://github.com/step-security/dopplerhq-cli-action/issues"
   },
   "license": "Apache-2.0",
   "author": "step-security",
   "repository": {
     "type": "git",
-    "url": "git+https://github.com/step-security/cli-action.git"
+    "url": "git+https://github.com/step-security/dopplerhq-cli-action.git"
   },
   "type": "module",
   "main": "bin/index.js",
